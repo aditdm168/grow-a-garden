@@ -1,43 +1,57 @@
---[[ AUTO FARM & AUTO SELL | GROW A GARDEN ]]--
+-- Auto Harvest, Auto Sell, Inventory Tracker
 
--- Konfigurasi:
-local JEDA_PANEN = 1       -- jeda detik antar panen
-local JEDA_JUAL = 2        -- jeda detik saat jual jika tas penuh
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local replicatedStorage = game:GetService("ReplicatedStorage")
 
--- Fungsi Cek Inventory
-function isBackpackFull()
-    local player = game.Players.LocalPlayer
-    local stats = player:FindFirstChild("Backpack")
-    if stats and stats:FindFirstChild("Value") and stats:FindFirstChild("MaxValue") then
-        return stats.Value.Value >= stats.MaxValue.Value
-    end
-    return false
-end
+-- Ganti path sesuai game-mu:
+local harvestEvent = replicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("HarvestCrop")
+local sellEvent = replicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("SellAllCrops")
+local inventory = player:WaitForChild("Inventory")
 
--- Fungsi Auto Panen
-function autoHarvest()
-    while wait(JEDA_PANEN) do
-        for _, plant in pairs(workspace:GetDescendants()) do
-            if plant:IsA("ProximityPrompt") and plant.Name == "HarvestPrompt" then
-                fireproximityprompt(plant)
+-- AUTO HARVEST
+spawn(function()
+    while true do
+        for _, crop in pairs(workspace.Crops:GetChildren()) do
+            if crop:FindFirstChild("Ready") and crop.Ready.Value == true then
+                harvestEvent:FireServer(crop)
+                wait(0.1)
             end
         end
+        wait(1)
     end
-end
+end)
 
--- Fungsi Auto Jual Hasil Panen
-function autoSell()
-    while wait(JEDA_JUAL) do
-        if isBackpackFull() then
-            local sellPart = workspace:FindFirstChild("SellArea") or workspace:FindFirstChild("Sell")
-            if sellPart then
-                game.Players.LocalPlayer.Character:PivotTo(sellPart.CFrame + Vector3.new(0, 2, 0))
-                wait(1)
-            end
+-- AUTO SELL jika inventory penuh
+local function isInventoryFull()
+    local current, maxStorage = 0, inventory.MaxStorage and inventory.MaxStorage.Value or 100
+    for _, item in pairs(inventory:GetChildren()) do
+        if item:IsA("IntValue") then
+            current = current + item.Value
         end
     end
+    return current >= maxStorage
 end
 
--- Jalankan dua fungsi secara bersamaan
-spawn(autoHarvest)
-spawn(autoSell)
+spawn(function()
+    while true do
+        if isInventoryFull() then
+            sellEvent:FireServer()
+            wait(1)
+        end
+        wait(2)
+    end
+end)
+
+-- INVENTORY TRACKER (print tiap 5 detik)
+spawn(function()
+    while true do
+        print("== INVENTORY ==")
+        for _, item in pairs(inventory:GetChildren()) do
+            if item:IsA("IntValue") then
+                print(item.Name .. ": " .. item.Value)
+            end
+        end
+        wait(5)
+    end
+end)
